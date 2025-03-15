@@ -4,9 +4,12 @@ from flask_cors import CORS  # Import flask-cors
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-@app.route("/", methods=["GET"])
-def home():
-    return "Strait-AI Backend is running!"
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    data = request.get_json() or {}
+    print("Received data:", data)  # Debugging
+    return jsonify({"response": "Test response!"})
+
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
