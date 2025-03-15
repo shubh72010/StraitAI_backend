@@ -2,6 +2,10 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
+@app.route("/", methods=["GET"])
+def home():
+    return "Strait-AI Backend is running!"
+
 @app.route("/api/chat", methods=["POST"])
 def chat():
     data = request.json
@@ -13,4 +17,4 @@ def chat():
     return jsonify({"response": ai_response})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=10000, debug=True)
