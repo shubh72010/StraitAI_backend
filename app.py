@@ -1,24 +1,89 @@
+from flask import Flask, request, jsonify, render_template
 from transformers import AutoModelForCausalLM, AutoTokenizer
+import pyttsx3
+from flask_cors import CORS
+import os
+from dotenv import load_dotenv
 
-# Load the Hugging Face model and tokenizer
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize Flask app and enable CORS
+app = Flask(__name__)
+CORS(app)
+
+# Initialize text-to-speech engine
+engine = pyttsx3.init()
+
+def speak(text: str) -> None:
+    """
+    Makes the AI speak the given text using pyttsx3.
+    """
+    engine.say(text)
+    engine.runAndWait()
+
+# Model configuration
+model_name = "EleutherAI/gpt-neo-1.3B"  # Open-access model
+token = os.getenv("HF_API_TOKEN")         # Fetch token securely from environment variables
+
+if not token:
+    raise Exception("Hugging Face API token not found. Please set HF_API_TOKEN in your .env file.")
+
 print("Loading the model... This may take some time.")
-model_name = "EleutherAI/gpt-neo-1.3B"  # Open-access Hugging Face model
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name, token=token)
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", token=token)
+
+def generate_response(query: str) -> str:
+    """
+    Generates a response using the Hugging Face model based on the provided query.
+    """
+    try:
+        # Tokenize input with padding and truncation
+        inputs = tokenizer(query, return_tensors="pt", padding=True, truncation=True).to("cpu")
+        outputs = model.generate(
+            inputs["input_ids"],
+            attention_mask=inputs["attention_mask"],
+            max_length=100,         # Limits output length for faster inference on CPU
+            temperature=0.7,        # Controls creativity
+            do_sample=True,         # Enables sampling mode
+            pad_token_id=tokenizer.eos_token_id
+        )
+        response_text = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+        return response_text
+    except Exception as e:
+        print("Error during response generation:", e)
+        return "Sorry, I couldn't generate a response."
+
+@app.route("/")
+def index():
+    """
+    Renders the homepage (index.html) located in the 'templates' folder.
+    """
+    return render_template("index.html")
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
     """
-    API endpoint to generate AI responses.
+    API endpoint to handle chat requests.
+    Receives JSON with a 'query' key and returns the AI's response.
     """
-    data = request.get_json() or {}
-    print("Received data:", data)  # Debugging
-    user_query = data.get("query", "")
-    if not user_query:
-        return jsonify({"response": "Please provide a query."})
+    try:
+        data = request.get_json() or {}
+        print("Received data:", data)  # Debug log
+        user_query = data.get("query", "")
+        if not user_query:
+            return jsonify({"response": "Please provide a valid query."})
+        
+        ai_response = generate_response(user_query)
+        print("Generated AI response:", ai_response)  # Debug log
+        
+        # Optional: Make the AI speak the response
+        speak(ai_response)
+        
+        return jsonify({"response": ai_response})
+    except Exception as e:
+        print("Error in /api/chat route:", e)
+        return jsonify({"response": "An error occurred while processing your request."}), 500
 
-    # Generate a response using Hugging Face
-    inputs = tokenizer(user_query, return_tensors="pt")
-    outputs = model.generate(inputs["input_ids"], max_length=100, temperature=0.7, do_sample=True)
-    ai_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return jsonify({"response": ai_response})
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
