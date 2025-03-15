@@ -1,6 +1,6 @@
 const chatBox = document.getElementById("chat-box");
 const userInput = document.getElementById("user-input");
-const API_URL = "/api/chat";
+const API_URL = "https://straitai-backend.onrender.com";
 
 function sendMessage() {
     let message = userInput.value.trim();
