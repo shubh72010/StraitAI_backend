@@ -4,3 +4,4 @@ transformers
 torch
 flask-cors
 python-dotenv
+pyttsx3
