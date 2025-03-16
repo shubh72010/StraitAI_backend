@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, render_template
 from transformers import AutoModelForCausalLM, AutoTokenizer
-import pyttsx3
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -12,16 +11,6 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Initialize text-to-speech engine
-engine = pyttsx3.init()
-
-def speak(text: str) -> None:
-    """
-    Makes the AI speak the given text using pyttsx3.
-    """
-    engine.say(text)
-    engine.runAndWait()
-
 # Model configuration
 model_name = "EleutherAI/gpt-neo-1.3B"  # Open-access model
 token = os.getenv("HF_API_TOKEN")         # Fetch token securely from environment variables
@@ -30,8 +19,8 @@ if not token:
     raise Exception("Hugging Face API token not found. Please set HF_API_TOKEN in your .env file.")
 
 print("Loading the model... This may take some time.")
-tokenizer = AutoTokenizer.from_pretrained(model_name, token=token)
-model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", token=token)
+tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=token)
+model = AutoModelForCausalLM.from_pretrained(model_name, use_auth_token=token).to("cpu")  # Ensures CPU usage
 
 def generate_response(query: str) -> str:
     """
@@ -43,7 +32,7 @@ def generate_response(query: str) -> str:
         outputs = model.generate(
             inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_length=100,         # Limits output length for faster inference on CPU
+            max_length=100,         # Limits output length for faster inference
             temperature=0.7,        # Controls creativity
             do_sample=True,         # Enables sampling mode
             pad_token_id=tokenizer.eos_token_id
@@ -73,13 +62,10 @@ def chat():
         user_query = data.get("query", "")
         if not user_query:
             return jsonify({"response": "Please provide a valid query."})
-        
+
         ai_response = generate_response(user_query)
         print("Generated AI response:", ai_response)  # Debug log
-        
-        # Optional: Make the AI speak the response
-        speak(ai_response)
-        
+
         return jsonify({"response": ai_response})
     except Exception as e:
         print("Error in /api/chat route:", e)
