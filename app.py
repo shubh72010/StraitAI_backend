@@ -12,15 +12,20 @@ app = Flask(__name__)
 CORS(app)
 
 # Model configuration
-model_name = "EleutherAI/gpt-neo-1.3B"  # Open-access model
-token = os.getenv("HF_API_TOKEN")         # Fetch token securely from environment variables
+model_name = "EleutherAI/gpt-neo-1.3B"  # Open-access model (switch to "gpt-neo-125M" if needed)
+token = os.getenv("HF_API_TOKEN")  # Fetch token securely from environment variables
 
 if not token:
     raise Exception("Hugging Face API token not found. Please set HF_API_TOKEN in your .env file.")
 
-print("Loading the model... This may take some time.")
-tokenizer = AutoTokenizer.from_pretrained(model_name, use_auth_token=token)
-model = AutoModelForCausalLM.from_pretrained(model_name, use_auth_token=token).to("cpu")  # Ensures CPU usage
+# Load model and tokenizer
+try:
+    print("Loading the model... This may take some time.")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name).to("cpu")  # Force CPU usage
+except Exception as e:
+    print("Error loading model:", e)
+    raise Exception("Model could not be loaded. Check the model name or API token.")
 
 def generate_response(query: str) -> str:
     """
