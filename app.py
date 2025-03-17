@@ -37,7 +37,7 @@ def generate_response(query: str) -> str:
         outputs = model.generate(
             inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_length=50,         # Limits output length for faster inference
+            max_length=30,         # Limits output length for faster inference
             temperature=0.7,        # Controls creativity
             do_sample=True,         # Enables sampling mode
             pad_token_id=tokenizer.eos_token_id
