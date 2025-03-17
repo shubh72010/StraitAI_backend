@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Model configuration
-model_name = "EleutherAI/gpt-neo-1.3B"  # Open-access model (switch to "gpt-neo-125M" if needed)
+model_name = "EleutherAI/gpt-neo-125M"  # Open-access model (switch to "gpt-neo-125M" if needed)
 token = os.getenv("HF_API_TOKEN")  # Fetch token securely from environment variables
 
 if not token:
@@ -37,7 +37,7 @@ def generate_response(query: str) -> str:
         outputs = model.generate(
             inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_length=100,         # Limits output length for faster inference
+            max_length=50,         # Limits output length for faster inference
             temperature=0.7,        # Controls creativity
             do_sample=True,         # Enables sampling mode
             pad_token_id=tokenizer.eos_token_id
