@@ -1,77 +1,45 @@
 from flask import Flask, request, jsonify, render_template
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from flask_cors import CORS
-import os
-from dotenv import load_dotenv
-import gc
+import torch
 
-# Load environment variables
-load_dotenv()
-
-# Flask and CORS setup
+# Initialize Flask app
 app = Flask(__name__)
-CORS(app)
 
-# Model configuration
-model_name = "distilgpt2"
-token = os.getenv("HF_API_TOKEN")
-
-if not token:
-    raise Exception("Hugging Face API token not found. Set HF_API_TOKEN in your .env file.")
-
-try:
-    print("Loading model...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name).to("cpu")
-except Exception as e:
-    print("Model load error:", e)
-    raise Exception("Model could not be loaded. Check name or token.")
-
-def generate_response(query):
-    try:
-        if not query.strip():
-            return "Please provide a valid query."
-        if len(query) > 500:
-            return "Query is too long. Limit to 500 characters."
-
-        print("Tokenizing input...")
-        inputs = tokenizer(query, return_tensors="pt", padding=True, truncation=True).to("cpu")
-
-        print("Generating output...")
-        outputs = model.generate(
-            inputs["input_ids"],
-            max_length=50,
-            temperature=0.7,
-            do_sample=True,
-            pad_token_id=tokenizer.eos_token_id
-        )
-        response_text = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
-        gc.collect()
-        return response_text
-
-    except Exception as e:
-        print("Error during response:", e)
-        gc.collect()
-        return "Error generating response."
+# Load pre-tuned conversational model
+model_name = "microsoft/DialoGPT-medium"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name)
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html")  # make sure index.html exists in a 'templates' folder
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
-    try:
-        data = request.get_json()
-        user_query = data.get("query", "")
-        if not user_query:
-            return jsonify({"response": "Please provide a valid query."})
+    user_input = request.get_json().get("query", "").strip()
 
-        ai_response = generate_response(user_query)
-        return jsonify({"response": ai_response})
+    if not user_input:
+        return jsonify({"response": "Uhh... you gonna say something or nah?"})
+
+    input_ids = tokenizer.encode(user_input + tokenizer.eos_token, return_tensors="pt")
+
+    try:
+        response_ids = model.generate(
+            input_ids,
+            max_length=1000,
+            pad_token_id=tokenizer.eos_token_id,
+            do_sample=True,
+            top_k=50,
+            top_p=0.95,
+            temperature=0.75
+        )
+
+        output = tokenizer.decode(response_ids[:, input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
+        return jsonify({"response": output})
 
     except Exception as e:
-        print("Error in /api/chat:", e)
-        return jsonify({"response": "Error processing request."}), 500
+        print("Error during generation:", str(e))
+        return jsonify({"response": "Whoops, I had a brain fart. Try again!"})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(debug=True)
